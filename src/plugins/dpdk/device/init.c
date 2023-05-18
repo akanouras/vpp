@@ -673,6 +673,13 @@ dpdk_bind_devices_to_uio (dpdk_config_main_t * conf)
 	 d->device_id == 0x1614 || d->device_id == 0x1606 ||
 	 d->device_id == 0x1609 || d->device_id == 0x1614)))
       ;
+    /* Aquantia Atlantic Adapter */
+    else if (d->vendor_id == 0x1d6a &&
+	(d->device_id == 0x00b1 || d->device_id == 0x80b1 ||
+	 d->device_id == 0x07b1 || d->device_id == 0x87b1 ||
+	 d->device_id == 0x08b1 || d->device_id == 0x88b1 ||
+	 d->device_id == 0x09b1 || d->device_id == 0x89b1))
+      ;
     else
       {
         dpdk_log_warn ("Unsupported PCI device 0x%04x:0x%04x found "

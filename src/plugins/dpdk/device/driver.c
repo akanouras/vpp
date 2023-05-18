@@ -80,7 +80,8 @@ static dpdk_driver_t dpdk_drivers[] = {
   {
     .drivers = DPDK_DRIVERS ({ "net_mlx4", "Mellanox ConnectX-3 Family" },
 			     { "net_qede", "Cavium QLogic FastLinQ QL4xxxx" },
-			     { "net_bnxt", "Broadcom NetXtreme E/S-Series" }),
+			     { "net_bnxt", "Broadcom NetXtreme E/S-Series" },
+			     { "net_atlantic", "Aquantia AQtion Family" }),
   },
   {
     .drivers = DPDK_DRIVERS ({ "net_virtio_user", "Virtio User" }),
