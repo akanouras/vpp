@@ -112,6 +112,21 @@ mrvl_pp2_eth_flag_change (vnet_main_t * vnm, vnet_hw_interface_t * hi,
   return 0;
 }
 
+static clib_error_t *
+mrvl_pp2_eth_set_max_frame_size (vnet_main_t * vnm, vnet_hw_interface_t * hi,
+				 u32 frame_size)
+{
+  mrvl_pp2_main_t *ppm = &mrvl_pp2_main;
+  mrvl_pp2_if_t *ppif = pool_elt_at_index (ppm->interfaces, hi->dev_instance);
+
+  if (pp2_ppio_set_mtu (ppif->ppio, frame_size))
+    return clib_error_return (0, "failed to set MTU %d on interface", frame_size);
+  if (pp2_ppio_set_mru (ppif->ppio, frame_size))
+    return clib_error_return (0, "failed to set MRU %d on interface", frame_size);
+
+  return 0;
+}
+
 void
 mrvl_pp2_delete_if (mrvl_pp2_if_t * ppif)
 {
@@ -287,6 +302,7 @@ mrvl_pp2_create_if (mrvl_pp2_create_if_args_t * args)
   eir.dev_instance = ppif->dev_instance;
   eir.address = mac_addr;
   eir.cb.flag_change = mrvl_pp2_eth_flag_change;
+  eir.cb.set_max_frame_size = mrvl_pp2_eth_set_max_frame_size;
   ppif->hw_if_index = vnet_eth_register_interface (vnm, &eir);
 
   sw = vnet_get_hw_sw_interface (vnm, ppif->hw_if_index);
