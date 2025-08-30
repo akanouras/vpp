@@ -29,6 +29,7 @@
 #include <vppinfra/linux/netns.h>
 
 #include <vnet/ip/ip_punt_drop.h>
+#include <vnet/dpo/punt_dpo.h>
 #include <vnet/fib/fib_table.h>
 #include <vnet/adj/adj_mcast.h>
 #include <vnet/udp/udp.h>
@@ -208,26 +209,31 @@ const fib_route_path_flags_t lcp_itf_route_path_flags[N_LCP_ITF_HOST] = {
 };
 
 static void
-lcp_itf_dhcp_bcast_punt (lcp_itf_pair_t *lip, u32 is_add)
+lcp_itf_local_bcast_punt_add_del (lcp_itf_pair_t *lip, u32 is_add)
 {
-  *key = (ip_punt_redirect_key_t){ 0 };
-  *rx  = (ip_punt_redirect_rx_t){ 0 };
+  const u32 fib_index =
+    fib_table_get_index_for_sw_if_index (FIB_PROTOCOL_IP4, lip->lip_phy_sw_if_index);
 
-  key->af            = AF_IP4;
-  key->punt.l4.proto = IP_PROTOCOL_UDP;
-  key->punt.l4.port  = clib_host_to_net_u16(UDP_DST_PORT_dhcp_to_server);
+  fib_prefix_t pfx = {
+    .fp_len   = 32,
+    .fp_proto = FIB_PROTOCOL_IP4,
+    .fp_addr  = { .ip4.as_u32 = clib_host_to_net_u32(0xffffffff) }, /* 255.255.255.255 */
+  };
 
-  key->prefix.fp_proto            = FIB_PROTO_IP4 /* or FIB_PROTOCOL_IP4 */;
-  key->prefix.fp_len              = 32;
-  key->prefix.fp_addr.ip4.as_u32  = clib_host_to_net_u32(0xFFFFFFFF); /* 255.255.255.255 */
+  const dpo_id_t *punt = punt_dpo_get (DPO_PROTO_IP4);
 
-  rx->rx_sw_if_index = lip->lip_phy_sw_if_index;
-  rx->tx_sw_if_index = lip->lip_host_sw_if_index;
-
-  if (is_add)
-    ip_punt_redirect_add(&key, &rx);
-  else
-    ip_punt_redirect_del(&key, &rx);
+  if (is_add) {
+    /* 255.255.255.255/32 -> PUNT, exempt from loose uRPF */
+    fib_table_entry_special_dpo_add (
+      fib_index,
+      &pfx,
+      FIB_SOURCE_PRIORITY_HI,
+      (fib_entry_flag_t) (FIB_ENTRY_FLAG_EXCLUSIVE | FIB_ENTRY_FLAG_LOOSE_URPF_EXEMPT),
+      punt);
+  } else {
+    fib_table_entry_special_remove (
+      fib_index, &pfx, FIB_SOURCE_PRIORITY_HI);
+  }
 }
 
 static void
@@ -343,7 +349,7 @@ lcp_itf_pair_add (u32 host_sw_if_index, u32 phy_sw_if_index, u8 *host_name,
 
   vec_free (rpaths);
 
-  lcp_itf_dhcp_bcast_punt (lip, 1);
+  lcp_itf_local_bcast_punt_add_del (lip, 1);
 
   lcp_itf_set_adjs (lip);
 
@@ -474,7 +480,7 @@ lcp_itf_pair_del (u32 phy_sw_if_index)
 
   lcp_itf_unset_adjs (lip);
 
-  lcp_itf_dhcp_bcast_punt (lip, 0);
+  lcp_itf_local_bcast_punt_add_del (lip, 0);
 
   ip4_punt_redirect_del (lip->lip_phy_sw_if_index);
   ip6_punt_redirect_del (lip->lip_phy_sw_if_index);
